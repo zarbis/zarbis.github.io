@@ -1,0 +1,16 @@
+version: "2"
+
+services:
+  builder:
+    image: jekyll/builder:3.8.5
+    command: jekyll build --watch
+    restart: "always"
+    volumes:
+      - ./:/srv/jekyll
+
+  web:
+    image: nginx:1.15.8-alpine
+    volumes:
+      - ./_site:/usr/share/nginx/html
+    ports:
+      - 8080:80
