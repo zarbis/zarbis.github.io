@@ -1,6 +1,7 @@
 ---
 layout: post
 title: Чудеса DOCKER_HOST
+permalink: /docker-host-wonders/
 date: '2017-09-28 21:18:38'
 tags:
 - docker

@@ -1,6 +1,7 @@
 ---
 layout: post
 title: Docker Swarm - синоним Докера в продакшене (для самых маленьких)
+permalink: /docker-swarm/
 date: '2017-11-04 11:31:46'
 tags:
 - docker

@@ -1,6 +1,7 @@
 ---
 layout: post
 title: 'Docker Registy: свой уголок без боли'
+permalink: /docker-registry/
 date: '2017-12-05 19:18:42'
 tags:
 - docker
@@ -9,7 +10,7 @@ tags:
 
 ![registry](/images/2017/12/registry.png)
 
-Возможность скачать с помощью `docker pull` базовый образ для почти любой ОС, языка или приложения, будь то веб-сервер, база данных или блог-платформа, на которой работает этот сайт - наверное главная киллер-фича, позволяющая влиться в докер-тусовку буквально за минуту. 
+Возможность скачать с помощью `docker pull` базовый образ для почти любой ОС, языка или приложения, будь то веб-сервер, база данных или блог-платформа, на которой работает этот сайт - наверное главная киллер-фича, позволяющая влиться в докер-тусовку буквально за минуту.
 
 # Реестр с точки зрения пользователя
 
@@ -18,12 +19,12 @@ tags:
 $ docker pull redis
 Using default tag: latest
 latest: Pulling from library/redis
-d13d02fa248d: Pull complete 
-039f8341839e: Pull complete 
-21b9cdda7eb9: Pull complete 
-c3eba3e5fbc2: Pull complete 
-7778a0753f87: Pull complete 
-b052cf77de81: Pull complete 
+d13d02fa248d: Pull complete
+039f8341839e: Pull complete
+21b9cdda7eb9: Pull complete
+c3eba3e5fbc2: Pull complete
+7778a0753f87: Pull complete
+b052cf77de81: Pull complete
 Digest: sha256:cd277716dbff2c0211c8366687d275d2b53112fecbf9d6c86e9853edb0900956
 Status: Downloaded newer image for redis:latest
 
@@ -119,4 +120,3 @@ Status: Image is up to date for redis:latest
 
 - [JWT Token Auth](https://docs.docker.com/registry/spec/auth/jwt/) позволяет реализовать сложные матрицы доступа к реестру. Одну реализацию предоставляет [GitLab](https://about.gitlab.com/), где каждому репозиторию ставится в соответствие свой образ в реестре и права на этот образ дублируют права на репозиторий: чтобы запушить образ надо иметь право на пуш в репу.
 - [Docker Trusted Registy](https://www.docker.com/enterprise-edition#/container_management) Энтерпрайсное решение от Docker Inc., соответствующее многим формальным требованиям безопасности.
-

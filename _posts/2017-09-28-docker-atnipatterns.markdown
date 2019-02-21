@@ -1,6 +1,7 @@
 ---
 layout: post
 title: Антипаттерны Докера
+permalink: /docker-atnipatterns/
 date: '2017-09-28 21:15:47'
 tags:
 - docker
