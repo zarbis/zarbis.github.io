@@ -3,8 +3,10 @@ version: "2"
 services:
   builder:
     image: jekyll/builder:3.8.5
-    command: jekyll serve
+    command: jekyll serve --drafts
     restart: "always"
+    # labels:
+    #   staging.permanent: true
     volumes:
       - ./:/srv/jekyll
     ports:
