@@ -1,0 +1,289 @@
+---
+layout: post
+title: 'Kubernetes: курс молодого бойца'
+permalink: /k8s-101/
+tags:
+- kubernetes
+- docker
+- devops
+---
+
+![k8s-logo](/images/2019/04/k8s-logo.png)
+
+Итак, мы [пробежались](/k8s-for-developers) по верхам матчасти кубера -- настало время понажимать кнопки. Сразу озвучу главный недостаток этой статьи: она будет поверхностна и неполна по множеству причин. Главная причина в том, что Kubernetes -- это система кластеризации, а значит для практики нам потребуется кластер. Докер устанавливается в виде одной программы на компьютер разработчика. Детально разобраться в основных командах и синтаксисе докерфайла можно на собственном ноутбуке. Хорошая демонстрация работы того же планировщика, распределяющего поды по нодам кластера, будет возможна только когда нод в этом кластере будет больше одного.
+
+## Создание кластера
+
+Эта статья расчитана в первую очередь на разработчика, который должен пользоваться готовым кластером, а не на администратора, чья работа -- его создавать и обслуживать. Поэтому я просто предложу пару простых и быстрых способов сделать одноразовый кластер на поиграться.
+
+### Локальный вариант
+
+Если хочется работать полностью локально, то надо собирать кластер на виртуалочках с помощью [Minikube](https://kubernetes.io/docs/setup/minikube/), его можно назвать грубой аналогией [docker-machine](https://docs.docker.com/machine/). Не могу рекомендовать данный вариант:
+
+- создание кластера из нескольких нод нетривиально
+- даже кластер из одной ноды потребует разобраться в устройстве тех частей кубера, знание о которых бесполезно в повседневной эксплуатации
+
+### Kubernetes-as-a-Service
+
+Многие облачные провайдеры предоставляют услугу создания кластера в пару кликов. Помимо создания провайдер берет на себя обслуживание, обновление, машстабирование и многие другие вопросы. Но для обучения нам важно, что мы можем получить кластер в несколько кликов, поиграться с ним и удалить.
+
+Среди вариантов: [GKE](https://cloud.google.com/kubernetes-engine/docs/quickstart) (Google), [EKS](https://aws.amazon.com/ru/eks/getting-started/) (Amazon), [AKS](https://azure.microsoft.com/en-us/free/services/kubernetes-service/) (Microsoft). Обычно провайдеры дают бесплатный стартовый кредит и/или небольшое количестве бесплатных ресурсов. Этого должно с лихвой хватить для учебных целей.
+
+Оставляю детальные шаги по созданию кастера и подключению к нему за пределами данной статьи, иначе она увеличится в размере в несколько раз. Советую лишь создать кластер хотя бы из трех нод минимального размера в любом регионе на выбор.
+
+В своих примерах я буду использовать GKE, но за пределами начальной настройки рабочего окружения работа с кластерами разных вендоров одинакова.
+
+### Подключение к кластеру
+
+В отличие от докера, кубер изначально расчитан на удаленную работу. В отличие от **docker-compose**, нет необходимости копировать ямлики на ноду кластера или делать фокусы с прокидыванием докер-сокета, чтобы запустить контейнеры на удаленном кластере. Клиентская консольная утилита [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/) общается с API-сервером кубера, с шифрованием, авторизацией, поддержкой нескольких контекстов для разных кластеров и т.д.
+
+Механизмы подключения и авторизации в кластере зависят от разновидности кубера, которой вы пользуетесь. Как правило "натравливание" `kubectl` на свежесозданный кластер будет заключаться в *"Запустите нашу утилиту и она заполнит ваш ~/.kube/config"*. Проверить подключение можно запустив:
+
+```
+kubectl get nodes
+
+NAME                                            STATUS   ROLES    AGE   VERSION
+gke-your-first-cluster-1-pool-1-aba8f8dc-9n92   Ready    <none>   1m    v1.11.8-gke.6
+gke-your-first-cluster-1-pool-1-f08db197-630s   Ready    <none>   1m    v1.11.8-gke.6
+gke-your-first-cluster-1-pool-1-f46c755f-2fc4   Ready    <none>   1m    v1.11.8-gke.6
+```
+
+Передо мной свежесозданный кластер из трех нод -- можно что-нибудь позапускать.
+
+## Запускаем первое приложение
+
+В теоретической статье я упоминал, что работа с кубером заключается в скармливании кластеру YAML-определений и ожидании, что он причешет реальность под наши хотелки. Говоря академическим языком: кубер -- декларативная система.
+
+Долго не мучая воображение, я нашел простенький [пример](https://github.com/paulbouwer/hello-kubernetes/blob/master/yaml/hello-kubernetes.yaml) на Гитхабе. Предлагаю открыть его и пробежаться по нему глазами, сильно не углубляясь в происходящее, а после этого -- запустить его:
+```
+kubectl apply -f https://raw.githubusercontent.com/paulbouwer/hello-kubernetes/master/yaml/hello-kubernetes.yaml
+
+service/hello-kubernetes created
+deployment.apps/hello-kubernetes created
+```
+Что сейчас произошло:
+
+- `kubectl` скачал файл и сохранил его во временный файл за меня
+- `kubectl` распарсил файл и отправил запрос с содержащимися в нем определениями ресурсов в `API-сервер`
+- `API-сервер` понял, что этих ресурсов не существует и сказал, что создал их
+
+Если я повторю ту же самую команду, то получу в ответ:
+```
+service/hello-kubernetes unchanged
+deployment.apps/hello-kubernetes unchanged
+```
+`API-сервер` понял, что ресурсы уже существуют и не стал ничего делать.
+
+**И -- идемпотентность**.
+
+Не сложно догадаться, что если бы я отредактировал этот ямлик и вновь скормил бы его куберу -- он бы заметил эти изменения и отчитался бы о тех ресурсах, что он обновит в соответствии с ними. В целом ситуация похожа на работу `docker-compose`.
+
+Давайте проверим, действительно ли что-то запустилось:
+```
+kubectl get all
+
+NAME                               DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/hello-kubernetes   3         3         3            3           8m
+
+NAME                                          DESIRED   CURRENT   READY   AGE
+replicaset.apps/hello-kubernetes-7bf6fbdb57   3         3         3       8m
+
+NAME                                    READY   STATUS    RESTARTS   AGE
+pod/hello-kubernetes-7bf6fbdb57-5nxv7   1/1     Running   0          8m
+pod/hello-kubernetes-7bf6fbdb57-b8886   1/1     Running   0          8m
+pod/hello-kubernetes-7bf6fbdb57-wj84v   1/1     Running   0          8m
+
+NAME                       TYPE           CLUSTER-IP      EXTERNAL-IP     PORT(S)        AGE
+service/hello-kubernetes   LoadBalancer   10.43.247.178   35.225.73.247   80:31750/TCP   8m
+service/kubernetes         ClusterIP      10.43.240.1     <none>          443/TCP        13m
+```
+
+Прежде чем детально разбираться -- откроем в браузере адрес из колонки `EXTERNAL-IP` и убедимся, что приложение работает.
+
+![hello-k8s](/images/2019/05/hello-k8s.png)
+
+### Разбираемся с результатом
+
+Отлично, работает, мы все сделали правильно, но... кубер сказал нам, что создал всего два ресурса, а в выхлопе контента сильно больше -- давайте разбираться. Итак, в YAML-файле у нас было определено два ресурса, сервис и деплоймент, оба с именем `hello-kubernetes`, мы их видем в списке, к ним претензий нет. Сразу отбросим `service/kubernetes` -- это служебный сервис для общения приложений с API кубера, присутствует всегда в каждом неймспейсе.
+
+А вот дальше -- интереснее. У нас есть репликасет и кучка подов. Если мы вспомним теорию -- то именно так и должен работать деплоймент:
+
+**Deployment** -- контроллер, управляющий *ReplicaSet*’ами. Именно с ним обычно непосредственно работают пользователи. Дополнительный уровень абстракции нужен для процесса обновления. При обновлении на новый образ контейнера создается новый ReplicaSet, в который "перекачиваются" поды из старого. Таким образом мы можем выкатить новую версию приложения без даунтайма. Плюс деплой хранит историю конфигураций и позволяет автоматически делать откат, если в процессе релиза что-то пошло не так.
+
+То есть деплоймент создал репликасет, который создал поды. Их связь прослеживается из имен:
+```
+deployment.apps/hello-kubernetes
+replicaset.apps/hello-kubernetes-7bf6fbdb57
+            pod/hello-kubernetes-7bf6fbdb57-5nxv7
+            pod/hello-kubernetes-7bf6fbdb57-b8886
+            pod/hello-kubernetes-7bf6fbdb57-wj84v
+```
+
+### Играемся и ломаем вещи
+
+Чтобы понять, зачем так сложно, попробуем немного поиграться с с этими ресурсами. У `kubectl` есть возможность редактировать ресурсы напрямую, причем несколькими способами.
+
+**Сразу оговорка: никогда не делайте так в продакшене, мы тут специально тренируемся все ломать.**
+
+Попробуем увеличить количество реплик нашего приложения:
+```
+kubectl scale deployment hello-kubernetes --replicas=4
+deployment.extensions/hello-kubernetes scaled
+```
+и посмотрим, что мы получили:
+```
+kubectl get deploy,rs,pods
+
+NAME                                     DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+deployment.extensions/hello-kubernetes   4         4         4            4           2h
+
+NAME                                                DESIRED   CURRENT   READY   AGE
+replicaset.extensions/hello-kubernetes-7bf6fbdb57   4         4         4       2h
+
+NAME                                    READY   STATUS    RESTARTS   AGE
+pod/hello-kubernetes-7bf6fbdb57-2sf7t   1/1     Running   0          31s
+pod/hello-kubernetes-7bf6fbdb57-5nxv7   1/1     Running   0          2h
+pod/hello-kubernetes-7bf6fbdb57-b8886   1/1     Running   0          2h
+pod/hello-kubernetes-7bf6fbdb57-wj84v   1/1     Running   0          2h
+```
+Чтобы не засорять вывод сервисами я сделал не `get all`, а указал конкретные ресурсы, плюс -- задал нужный мне порядок, соответствующий  "наследственности" ресурсов.
+
+*Посмотреть список всех доступных ресурсов, их краткие и полные имена можно через `kubectl api-resources`.*
+
+Мы видим, что у деплоймента и репликасета везде теперь четверочки и появился новый под, корому меньше минуты от роду.
+
+Пока прикольно, продолжаем баловаться: что случится, если мы удалим под, симулировав падение ноды, где он был запущен:
+```
+kubectl delete pod/hello-kubernetes-7bf6fbdb57-5nxv7
+pod "hello-kubernetes-7bf6fbdb57-5nxv7" deleted
+```
+Результат вполне предсказуем:
+```
+kubectl get pods
+
+NAME                                READY   STATUS    RESTARTS   AGE
+hello-kubernetes-7bf6fbdb57-2sf7t   1/1     Running   0          4m
+hello-kubernetes-7bf6fbdb57-b8886   1/1     Running   0          2h
+hello-kubernetes-7bf6fbdb57-wj84v   1/1     Running   0          2h
+hello-kubernetes-7bf6fbdb57-x58hh   1/1     Running   0          49s
+````
+Вместо пода `*-5nxv7` был создан `*-x58hh`, мы видим это по возрасту подов. Мы застрахованы от падения нод и еще целого класса неприятностей.
+
+**У -- устойчивость**
+
+### Делаем релизы
+
+Внимательный читатель может заметить, что для этих целей хватило бы и репликасета, зачем нам тогда надстройка в виде деплоймента? Давайте попробуем выкатить новый релиз нашего приложения:
+```
+kubectl set image deploy/hello-kubernetes hello-kubernetes=paulbouwer/hello-kubernetes:1.4
+```
+Здесь я указываю, что контейнеру `hello-kubernetes` внутри подов, создаваемых через деплоймент `hello-kubernetes` нужно задать такой-то образ. Мы ведь помним, что в поде может быть больше одного контейнера, правда?
+
+Если иметь быстрые руки и медленный кластер, то можно увидеть процесс выкатки новой версии. Вот состояние нашего приложения в 3 момента времени:
+
+1) релиз только начался:
+```
+NAME                                     DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+deployment.extensions/hello-kubernetes   4         5         2            3           2h
+
+NAME                                                DESIRED   CURRENT   READY   AGE
+replicaset.extensions/hello-kubernetes-55857678b4   2         2         0       4s
+replicaset.extensions/hello-kubernetes-7bf6fbdb57   3         3         3       2h
+
+NAME                                    READY   STATUS              RESTARTS   AGE
+pod/hello-kubernetes-55857678b4-gh8t6   0/1     ContainerCreating   0          4s
+pod/hello-kubernetes-55857678b4-sd49c   0/1     ContainerCreating   0          4s
+pod/hello-kubernetes-7bf6fbdb57-2sf7t   1/1     Running             0          17m
+pod/hello-kubernetes-7bf6fbdb57-b8886   1/1     Running             0          2h
+pod/hello-kubernetes-7bf6fbdb57-wj84v   1/1     Running             0          2h
+```
+Мы видим, что создался новый репликасет `*-55857678b4` для которого желаемое состояние -- 2 пода. Они пока еще не готовы, о чем свидетельствуют статусы `ContainerCreating` у его подов.
+
+2) релиз на пол пути:
+```
+NAME                                     DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+deployment.extensions/hello-kubernetes   4         4         4            3           2h
+
+NAME                                                DESIRED   CURRENT   READY   AGE
+replicaset.extensions/hello-kubernetes-55857678b4   4         4         4       8s
+replicaset.extensions/hello-kubernetes-7bf6fbdb57   0         0         0       2h
+
+NAME                                    READY   STATUS        RESTARTS   AGE
+pod/hello-kubernetes-55857678b4-6qqhl   1/1     Running       0          4s
+pod/hello-kubernetes-55857678b4-gh8t6   1/1     Running       0          9s
+pod/hello-kubernetes-55857678b4-sd49c   1/1     Running       0          9s
+pod/hello-kubernetes-55857678b4-wgzch   1/1     Running       0          5s
+pod/hello-kubernetes-7bf6fbdb57-2sf7t   0/1     Terminating   0          17m
+pod/hello-kubernetes-7bf6fbdb57-b8886   0/1     Terminating   0          2h
+pod/hello-kubernetes-7bf6fbdb57-wj84v   0/1     Terminating   0          2h
+```
+У нас есть 4 пода в новом репликасете и мы вычищаем поды от старого, т.к. у него желаемое состояние -- 0 подов.
+
+3) релиз завершился, состояние пришло к желаемому:
+```
+NAME                                     DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+deployment.extensions/hello-kubernetes   4         4         4            4           2h
+
+NAME                                                DESIRED   CURRENT   READY   AGE
+replicaset.extensions/hello-kubernetes-55857678b4   4         4         4       15s
+replicaset.extensions/hello-kubernetes-7bf6fbdb57   0         0         0       2h
+
+NAME                                    READY   STATUS    RESTARTS   AGE
+pod/hello-kubernetes-55857678b4-6qqhl   1/1     Running   0          10s
+pod/hello-kubernetes-55857678b4-gh8t6   1/1     Running   0          15s
+pod/hello-kubernetes-55857678b4-sd49c   1/1     Running   0          15s
+pod/hello-kubernetes-55857678b4-wgzch   1/1     Running   0          11s
+```
+
+Подробно алгоритм работы деплоймента выглядит следующим образом:
+
+1. создать новый репликасет с новым шаблоном подов
+2. "перелить" поды из старого репликасета в новый:
+  - интрементнуть `DESIRED` у нового репликасета
+  - дождаться, пока под нового репликасета станет `READY`
+  - декрементнуть `DESIRED` у старого репликасета
+  - дождаться удаления пода старого репликасета
+3. делать пункт **2** пока старый репликасет не опустеет, а новый -- не станет равен по размеру `DESIRED` деплоймента
+
+Возможно звучит путано, попробуем разобраться с помощью одной из самых полезных команд: `kubectl describe`. Эта команда показывает выжимку информации о том или ином ресурсе, а под ней -- события, происходившие с этим ресурсом. На эти события сейчас и обратим внимание:
+```
+kubectl describe deploy hello-kubernetes
+
+...
+Message
+-------
+Scaled up   replica set hello-kubernetes-7bf6fbdb57 to 4
+Scaled up   replica set hello-kubernetes-55857678b4 to 1
+Scaled down replica set hello-kubernetes-7bf6fbdb57 to 3
+Scaled up   replica set hello-kubernetes-55857678b4 to 2
+Scaled down replica set hello-kubernetes-7bf6fbdb57 to 2
+Scaled up   replica set hello-kubernetes-55857678b4 to 3
+Scaled down replica set hello-kubernetes-7bf6fbdb57 to 1
+Scaled up   replica set hello-kubernetes-55857678b4 to 4
+Scaled down replica set hello-kubernetes-7bf6fbdb57 to 0
+```
+Мы отчетливо видим, как поды "перетекают" из старого репликасета в новый.
+
+#### Лошадиные силы
+
+Момент, который стоит подметить: сумма подов в старом и новом репликасетах никогда не падает ниже `DESIRED` в деплойменте: 4+1, 3+2, 2+3, 1+4, 0+4. Это означает, что во время релиза у нас не будет просадки в "лошадиных силах", обслуживающих пользователей.
+
+**П -- производительность**
+
+#### Скорость релизов
+
+Может показаться, что релиз происходит поштучно, по одному поду за раз. На самом деле это не так. Если мы еще раз посмотрим выхлоп команды выше:
+```
+kubectl describe deploy hello-kubernetes
+...
+RollingUpdateStrategy:  25% max unavailable, 25% max surge
+...
+```
+то увидим, две интересных цифры:
+
+- `maxSurge` указывает количество подов на которое будет инкрементиться/декрементиться количество подов в репликасетах
+- `maxUnavailable` указывает количество новых подов, которые должны сфейлиться, чтобы случился автоматический откат релиза
+
+В нашем случае 25% от 4 реплик - это ровно 1, и мы не увидели разницы... но в случае какого-нибудь особо отмасштабированного сервиса с 50 репликами поштучный релиз мог бы затянуться на несколько часов.
+
+**С -- скорость**
