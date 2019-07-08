@@ -1,6 +1,6 @@
 ---
 layout: post
-title: 'Kubernetes: первая парктика'
+title: 'Kubernetes: первая практика'
 permalink: /k8s-101/
 tags:
 - kubernetes
