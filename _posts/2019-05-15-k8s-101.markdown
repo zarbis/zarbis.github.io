@@ -182,63 +182,31 @@ kubectl set image deploy/hello-kubernetes hello-kubernetes=paulbouwer/hello-kube
 ```
 Здесь я указываю, что во всех подах деплоймента `hello-kubernetes` контейнеру `hello-kubernetes` нужно задать такой-то образ. Мы ведь помним, что в поде может быть больше одного контейнера, правда?
 
-Если иметь быстрые руки и медленный кластер, то можно увидеть процесс выкатки новой версии. Пронаблюдаем его в реальном времени, а затем -- разберемся в том, что же именно произошло.
-
-Вот состояние нашего приложения в 3 момента времени:
-
-1) релиз только начался:
+Пронаблюдаем его в реальном времени с помощью ключа `--watch`, а затем -- разберемся в том, что же именно произошло:
 ```
-NAME                                     DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
-deployment.extensions/hello-kubernetes   4         5         2            3           2h
+kubectl get pods --watch
 
-NAME                                                DESIRED   CURRENT   READY   AGE
-replicaset.extensions/hello-kubernetes-55857678b4   2         2         0       4s
-replicaset.extensions/hello-kubernetes-7bf6fbdb57   3         3         3       2h
+NAME                                READY   STATUS              RESTARTS   AGE
+hello-kubernetes-55857678b4-mvwn2   0/1     Pending             0          0s
+hello-kubernetes-55857678b4-mvwn2   0/1     ContainerCreating   0          0s
+hello-kubernetes-55857678b4-mvwn2   0/1     Running             0          13s
+hello-kubernetes-55857678b4-mvwn2   1/1     Running             0          22s
+hello-kubernetes-7bf6fbdb57-2sf7t   1/1     Terminating         0          4m
 
-NAME                                    READY   STATUS              RESTARTS   AGE
-pod/hello-kubernetes-55857678b4-gh8t6   0/1     ContainerCreating   0          4s
-pod/hello-kubernetes-55857678b4-sd49c   0/1     ContainerCreating   0          4s
-pod/hello-kubernetes-7bf6fbdb57-2sf7t   1/1     Running             0          17m
-pod/hello-kubernetes-7bf6fbdb57-b8886   1/1     Running             0          2h
-pod/hello-kubernetes-7bf6fbdb57-wj84v   1/1     Running             0          2h
+hello-kubernetes-55857678b4-9vvkv   0/1     Pending             0          0s
+hello-kubernetes-55857678b4-9vvkv   0/1     ContainerCreating   0          0s
+hello-kubernetes-55857678b4-9vvkv   0/1     Running             0          11s
+hello-kubernetes-55857678b4-9vvkv   1/1     Running             0          17s
+hello-kubernetes-7bf6fbdb57-b8886   1/1     Terminating         0          2h
+
+hello-kubernetes-55857678b4-nz2m9   0/1     Pending             0          0s
+hello-kubernetes-55857678b4-nz2m9   0/1     ContainerCreating   0          0s
+hello-kubernetes-55857678b4-nz2m9   0/1     Running             0          11s
+hello-kubernetes-55857678b4-nz2m9   1/1     Running             0          17s
+hello-kubernetes-7bf6fbdb57-wj84v   1/1     Terminating         0          2h
+...
 ```
-Мы видим, что создался новый репликасет `*-55857678b4` для которого желаемое состояние -- 2 пода. Они пока еще не готовы, о чем свидетельствуют статусы `ContainerCreating` у его подов.
-
-2) релиз на пол пути:
-```
-NAME                                     DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
-deployment.extensions/hello-kubernetes   4         4         4            3           2h
-
-NAME                                                DESIRED   CURRENT   READY   AGE
-replicaset.extensions/hello-kubernetes-55857678b4   4         4         4       8s
-replicaset.extensions/hello-kubernetes-7bf6fbdb57   0         0         0       2h
-
-NAME                                    READY   STATUS        RESTARTS   AGE
-pod/hello-kubernetes-55857678b4-6qqhl   1/1     Running       0          4s
-pod/hello-kubernetes-55857678b4-gh8t6   1/1     Running       0          9s
-pod/hello-kubernetes-55857678b4-sd49c   1/1     Running       0          9s
-pod/hello-kubernetes-55857678b4-wgzch   1/1     Running       0          5s
-pod/hello-kubernetes-7bf6fbdb57-2sf7t   0/1     Terminating   0          17m
-pod/hello-kubernetes-7bf6fbdb57-b8886   0/1     Terminating   0          2h
-pod/hello-kubernetes-7bf6fbdb57-wj84v   0/1     Terminating   0          2h
-```
-У нас есть 4 пода в новом репликасете и мы вычищаем поды от старого, т.к. у него желаемое состояние -- 0 подов.
-
-3) релиз завершился, состояние пришло к желаемому:
-```
-NAME                                     DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
-deployment.extensions/hello-kubernetes   4         4         4            4           2h
-
-NAME                                                DESIRED   CURRENT   READY   AGE
-replicaset.extensions/hello-kubernetes-55857678b4   4         4         4       15s
-replicaset.extensions/hello-kubernetes-7bf6fbdb57   0         0         0       2h
-
-NAME                                    READY   STATUS    RESTARTS   AGE
-pod/hello-kubernetes-55857678b4-6qqhl   1/1     Running   0          10s
-pod/hello-kubernetes-55857678b4-gh8t6   1/1     Running   0          15s
-pod/hello-kubernetes-55857678b4-sd49c   1/1     Running   0          15s
-pod/hello-kubernetes-55857678b4-wgzch   1/1     Running   0          11s
-```
+Видна явная цикличность, когда один старый под подменяется новым, с ожиданием готовности нового пода.
 
 Подробно алгоритм работы деплоймента выглядит следующим образом:
 
